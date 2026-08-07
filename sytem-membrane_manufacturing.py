@@ -7,6 +7,18 @@ The Pennsylvania State University
 Advisor: Rui Shi
 
 Last modified: 04/27/2026
+
+
+Uses qsdsan, biosteam.
+
+Workflow
+--------
+    1. Process simulation:
+        Polymer options: PSF, CA, CA(bio_AA) 
+        Scenario options: recycling (only available for PSF)
+    2. Baseline life cycle assessment
+    3. Uncertainty and sensitivity analyses
+
 """
 # %%
 #Import packages
@@ -50,7 +62,7 @@ from Units.Regeneration_Tank import Regeneration_tank
 from Units.Regeneration_bath import Regeneration_bath
 from Units.Dilution_Tank import Dilution_tank
 
-#For LCA
+#For LCA (check _lca_data_membrane_.py)
 cf_dct = _load_lca_data_membrane()
 
 
@@ -63,16 +75,16 @@ cmps1= create_components_membrane()
 def system_membrane(polymer_solution, polymer_option, solvent_recycling):  
     """ Creates the class that models the membrane manufacturing process and 
         performs a life cycle assessment (LCA) using Ecoinvent 3.10 database for background 
-        data and the ReCiPe 2016 v1.03 midpoint H cut-off method.
+        data and the ReCiPe 2016 v1.03 midpoint H cut-off impact assessment method.
 
     Parameters
     ----------
     polymersol : float
         Volume of polymer solution processed per day, [L/day] (the default is 2000 L).
-    polumer_option : str
-        PSF, CA, CA_bioAA, referring to the polysulfone, cellulose acetate, cellulose acetate prepared using biobased acetic acid, respectively.
+    polymer_option : str
+        PSF, CA, CA_bioAA, referring to the polysulfone, cellulose acetate, cellulose acetate synthesized using biobased acetic acid, respectively.
     solvent_recycling : str
-        Wheter or not the system includes solvent recovery and recycling, the options are: yes or no.
+        Wheter or not the system includes solvent recovery and recycling, the options are: yes or no. This only works for PSF polymer option.
     
     Returns
     -----
@@ -81,9 +93,9 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
     lca : qsdsan.lca
         Table of given annual impact categories per construction, transport, streams and others.
     membrane_area_per_year : float
-        Annual membrane output [m²/year], used as the functional unit
+        Annual membrane output [m^2/year], used as the functional unit
         for normalizing LCA results. Calculated from polymer
-        mass flow rate and polymer mass per membrane area [kg/m²].
+        mass flow rate and polymer mass per membrane area [kg/m^2].
 
     See Also
     --------
@@ -101,13 +113,13 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
     },
 
     'CA': {
-        'component': cmps1['polysulfone'],  #we are gonna treat all the other properties same as PSF, except for the density
+        'component': cmps1['polysulfone'],  #we are gonna treat all the other properties same as PSF, except for the density, in the reporting CA will appear under PSF column
         'density': 1300,  # kg/m^3 (range 1280 to 1320 kg/m^3)
         'post_treatment': 'regeneration',  
     },
 
     'CA_bioAA': {
-        'component': cmps1['polysulfone'],  #we are gonna treat all the other properties same as PSF, except for the density
+        'component': cmps1['polysulfone'],  #we are gonna treat all the other properties same as PSF, except for the density, in the reporting CA_bioAA will appear under PSF column
         'density': 1300,  # kg/m^3 (range 1280 to 1320 kg/m^3)
         'post_treatment': 'regeneration',  
     }
@@ -137,7 +149,7 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
 
         Parameters are updated dynamically through the `update()` method to ensure
         consistency across all units during simulation and uncertainty analysis.
-        ...
+        
 
         Attributes
         ----------
@@ -186,7 +198,7 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
         thickness_module : float
             Module wall thickness [m] (the default is 0.005).
 
-        --- Derived properties (computed in update) ---
+        --- Derived properties (computed in 'update') ---
         d_polymersol : float
             Density of polymer solution [kg/m³].
         d_boresol : float
@@ -326,11 +338,11 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
                         self._water,  self._glycerol)
    
     params = MembraneParams()
-    params.update(solvent, additive, water, glycerol)  # call once at the system creation to calcualte derived properties and store _solvent, ....
+    params.update(solvent, additive, water, glycerol)  # call once at the system creation to calculate derived properties and store _solvent, ....
 
     
     #-----CREATING INLET STREAMS-----
-    # Conditional in membrane polymer option
+    # Conditional in membrane polymer option, prices are not needed for LCA analysis
     if polymer_option == 'PSF':
         qs.SanStream('polymer', stream_impact_item=qs.StreamImpactItem.get_item('PSF_item'), price=15, phase='s', T=25+273, P=101325)  
     elif polymer_option == 'CA':
@@ -414,7 +426,6 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
         if polymer_option in ('CA', 'CA_bioAA'):
             RGT1= Regeneration_tank('RGT201', ins=(fs_stream.sodium_hydroxide, fs_stream.ethanol_rsolution, fs_stream.water_rsolution,'ethanolsol_recycled'), outs='regeneration_solution',
                  params=params, naoh_concentration=0.2, tau=0.5, kW_per_m3=2)   
-            #HXB4= qs.sanunits.HXutility('HX201b', ins=RGT1-0, outs='regeneration_solutionh', T= 70+273.15, rigorous=False) #seems that regeneration is done at ambient temperature
             RB1= Regeneration_bath('RB201', ins=(CB1-0, RGT1-0), outs=('lumen_for_rinsing', 'wastewater1b'), tau=0.5, kW_per_m3=1.25) #from Ref 1 in regeneration tank
             SP1 = qs.sanunits.Splitter ('SP201', ins=RB1-1, outs=('purge', 3-RGT1), split=0.025)  #use a purge so Na-aacetate does not build up in the stream that is concentrated with EtOH, well controled systems purge 1-5%
 
@@ -437,7 +448,7 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
                                     fraction_filled=1.1, params=params, rigorous=False)
         P10=qs.sanunits._pumping.Pump('P302', ins=M7-0, outs='water_conditioning301', P=101324, material='Stainless steel')  #to the tank
 
-        DT3 = qs.sanunits.MixTank('MT301', ins=( P9-0, P10-0), outs=('conditioning_solutionc'), tau=0.5, kW_per_m3=1.25)  #Ranges from 1.0-1.5, which correspond to liquid-liquid mixing ##Residence time suggested for chta gpt for easy mixtures
+        DT3 = qs.sanunits.MixTank('MT301', ins=( P9-0, P10-0), outs=('conditioning_solutionc'), tau=0.5, kW_per_m3=1.25)  #Ranges from 1.0-1.5
         HX6=qs.sanunits.HXutility('HX301', ins=DT3-0, outs='conditioning_solutionh', T = 30+273, rigorous=False)
         P11=qs.sanunits._pumping.Pump('P303', ins=HX6-0, outs='conditioning_solution301', P=101324, material='Stainless steel')
         CT1 = Conditioning_tank('CT301', ins=(RT1-0, P11-0), outs=('conditioned_fiber'),tau=0.5, kW_per_m3=1.25, conditioning_temperature=30+273)   #same as rinsing tank
@@ -508,7 +519,6 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
         if polymer_option in ('CA', 'CA_bioAA'):  
             RGT1= Regeneration_tank('RGT201', ins=(fs_stream.sodium_hydroxide, fs_stream.ethanol_rsolution, fs_stream.water_rsolution,'ethanolsol_recycled'), outs='regeneration_solution',
                  params=params, naoh_concentration=0.2, tau=0.5, kW_per_m3=2)   
-            #HXB4= qs.sanunits.HXutility('HX201b', ins=RGT1-0, outs='regeneration_solutionh', T= 70+273.15, rigorous=False) #seems that regeneration is done at ambient temperature
             RB1= Regeneration_bath('RB201', ins=(CB1-0, RGT1-0), outs=('lumen_for_rinsing', 'wastewater1b'), tau=0.5, kW_per_m3=1.25) #from Ref 1 in regeneration tank
             SP1 = qs.sanunits.Splitter ('SP201', ins=RB1-1, outs=('purge', 3-RGT1), split=0.025)  #use a purge so Na-aacetate does not build up in the stream that is concentrated with EtOH
 
@@ -531,16 +541,16 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
                                     fraction_filled=1.1, params=params, rigorous=False)
         P10=qs.sanunits._pumping.Pump('P302', ins=M7-0, outs='water_conditioning301', P=101324, material='Stainless steel')  #to the tank
 
-        DT3 = qs.sanunits.MixTank('MT301', ins=( P9-0, P10-0), outs=('conditioning_solutionc'), tau=0.5, kW_per_m3=1.25)  #Ranges from 1.0-1.5, which correspond to liquid-liquid mixing ##Residence time suggested for chta gpt for easy mixtures
+        DT3 = qs.sanunits.MixTank('MT301', ins=( P9-0, P10-0), outs=('conditioning_solutionc'), tau=0.5, kW_per_m3=1.25)  #Ranges from 1.0-1.5
         HX6=qs.sanunits.HXutility('HX301', ins=DT3-0, outs='conditioning_solutionh', T= 30+273, rigorous=False)
         P11=qs.sanunits._pumping.Pump('P303', ins=HX6-0, outs='conditioning_solution301', P=101324, material='Stainless steel')
 
-        CT1 = Conditioning_tank('CT301', ins=(RT1-0, P11-0), outs=('conditioned_fiber'),tau=12, kW_per_m3=1.25, conditioning_temperature=30+273.5)   #high uncertainty in the residence time
+        CT1 = Conditioning_tank('CT301', ins=(RT1-0, P11-0), outs=('conditioned_fiber'),tau=12, kW_per_m3=1.25, conditioning_temperature=30+273.5)   
         
         DY1 = Dryer('DY301', ins=(CT1-0), outs=('solid_fiber', 'wastewater3a'), final_moisture=0.0, drying_T = 50+273.15, dryer_efficiency = 0.7)
         HX7 = qs.sanunits.HXutility('HX302', ins=DY1-1, outs='wastewater3', T= 25+273.15, rigorous=False)
         
-        #If we simulate the solids of PVP and PEG (we need to indicate a portion of this goes into wastewater streams!!, increased viscosity-fouling risk! not sure about precipitation)
+       
         
         #Module assembly
         MD1 = Module_assembly('MD401', ins=(DY1-0, fs_stream.polysulfone_module, fs_stream.epoxy_module), outs=('module'), electricity_per_membranearea= 0.0667, 
@@ -569,8 +579,6 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
     else:
         raise RuntimeError('in function "system_membrane" argument "solvent_recycling" must be either "yes" or "no"')
     
-    # RECYCLING NEEDS TO SOLVE FOR CA EVENTHOUGH MAYBE NO NEED RIGHT NOW AS WITH PSF WE CAN WORK IT OUT
-    # Only recycling when water is less amount!
 
     sys_membrane.simulate()
     sys_membrane.show()
@@ -656,8 +664,16 @@ def system_membrane(polymer_solution, polymer_option, solvent_recycling):
     
     return sys_membrane, lca, membrane_area_per_year
 
+# ===========================================================================
+# Simulation and LCA results for baseline scenarios
+# ===========================================================================
+
+#Modify depending on the scenario needed
 system, lca, membrane_area_per_year= system_membrane(8000, 'PSF', 'no')
+
 print(membrane_area_per_year)
+
+#Uncomment to get an excel file with Simulation and LCA results
 #system.save_report(file='test_recycling_150.xlsx')
 
 LCAresults = LCAResults(lca=lca, 
@@ -671,15 +687,14 @@ LCAresults.show()
 #LCAresults.save()
 
 # ===========================================================================
-# Uncertainty analysis
+# Uncertainty analysis (uncomment if needed)
 # ===========================================================================
 
 # uncertainty, stats = uncertainty_analysis(system, 'all', 3000, membrane_area_per_year,
 #                        'PSF', 'yes')
 
-# # # Access full results table if needed
-# #only main metics
-# # --- Final metric scores ONLY (what you report in paper) ---
+# Access full results table if needed
+
 # actual_metric_names = [
 #     f'{m.name} [{m.units}]'
 #     for m in uncertainty.metrics
@@ -688,13 +703,14 @@ LCAresults.show()
 # final_scores = uncertainty.table.loc[:, 'LCA'][actual_metric_names]
 # final_scores.to_csv('uncertainty_PSF_yes_3000.csv')
 
-#lca bacground and results
+##lca bacground and results
 #results_table = uncertainty.table.loc[:, 'LCA']
-#whole table
+
+##whole table
 #results_table.to_csv('uncertainty_PSF_no_1000.csv')
 
 # ===========================================================================
-# Sensitivity analysis
+# Sensitivity analysis (uncomment if needed)
 # ===========================================================================
 
 # sensitivity_model, r_df, p_df = sensitivity_analysis(
@@ -710,9 +726,10 @@ LCAresults.show()
 
 # %%
 # ===========================================================================
-# How to get the results per m^2 membrane (results from LCA are per year)
+# How to get the results per m^2 membrane (results from LCA are per year, uncomment if needed)
 # ===========================================================================
 #Get LCA results
+
 # impacts_per_m2 = {
 #     indicator: value / membrane_area_per_year
 #     for indicator, value in lca.get_total_impacts().items()
@@ -722,21 +739,9 @@ LCAresults.show()
 # for indicator, value in impacts_per_m2.items():
 #     print(f'  {indicator}: {value:.6e}')
 
-# # ================================================================
-# # 2. CONTRIBUTION BY STREAM
-# # ================================================================
-# stream_contributions1 = lca.get_impact_table('Stream')
-# stream_contributions2 = lca.get_impact_table ('Other')
-# print(stream_contributions1)
-# print(stream_contributions2)
 
 
-# #See all streams the LCA is tracking with their annual flows (this can help us to identify if we do not need to add manually in the LCA)
-# print('=== Streams tracked by LCA ===')
-# for s in lca.system.streams:
-#     if hasattr(s, 'stream_impact_item') and s.stream_impact_item is not None:
-#         item = s.stream_impact_item
-#         print(f'{s.ID:30s} | F_mass={s.F_mass:.4f} kg/hr | item={item.ID}')
+
 
 
 # %%
