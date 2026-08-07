@@ -14,7 +14,7 @@ Last modified: 04/23/2026
 Uses brightway2.5 (bw2data / bw2io / bw2calc).
 Uses ecoinvent 3.10 cutoff.
 
-For PSF, CA, and CA-bioAA: CFs are injected directly from excel worksheet analysis.
+For PSF, CA, and CA-bioAA: CFs are added directly from excel worksheet analysis.
 
 For all other streams: CFs are calculated via bw2calc from ecoinvent 3.10.
 
@@ -37,14 +37,12 @@ import numpy as np
 import pandas as pd
 import qsdsan as qs
 
-# brightway2.5  (the three core packages — no "import brightway2")
+# brightway2.5  (the three core packages)
 import bw2data as bd
 import bw2io   as bi
 import bw2calc as bc
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
+
 c_path    = os.path.dirname(__file__)   #the path of the current script
 data_path = os.path.join(c_path, 'data')
 os.makedirs(data_path, exist_ok=True)
@@ -58,11 +56,12 @@ __all__ = (
     '_load_lca_data_membrane',
 )
 
+
 # %%
 # ===========================================================================
-# 1.  Project + database setup
+# Project + database setup
 # ===========================================================================
-#
+
 # Database names produced by bw2io.import_ecoinvent_release for v3.10 cutoff:
 #   "ecoinvent-3.10-cutoff"    — technosphere (market activities etc.)
 #   "ecoinvent-3.10-biosphere" — elementary flows
@@ -98,20 +97,19 @@ eidb = bd.Database(EI_DB_NAME)
 bsdb = bd.Database(BS_DB_NAME)
 
 
-
 # %%
 # ===========================================================================
 # 2.  ReCiPe 2016 Midpoint (H) indicator definitions
-#
+# ===========================================================================
 #     Each entry: (qsdsan_ID, bw2_method_tuple, unit)
 #
 #     The bw2_method_tuple is the exact key in bd.methods for ecoinvent 3.10.
 #     To inspect available methods after importing ecoinvent, run:
 #       [m for m in bd.methods if 'ReCiPe 2016' in str(m) and 'midpoint' in str(m).lower()]
-# ===========================================================================
+
 
 INDICATORS = [
-    # (qsdsan ID,   brightway2.5 method tuple ,                                                                                   unit)
+    # (qsdsan ID,   brightway2.5 method tuple ,                                                                                                                   unit)
     ('TAP',     ('ecoinvent-3.10', 'ReCiPe 2016 v1.03, midpoint (H)',  'acidification: terrestrial',              'terrestrial acidification potential (TAP)'),      'kg SO2-Eq'),
     ('GWP',     ('ecoinvent-3.10', 'ReCiPe 2016 v1.03, midpoint (H)',  'climate change',                         'global warming potential (GWP100)'),             'kg CO2-Eq'),
     ('FETP',    ('ecoinvent-3.10', 'ReCiPe 2016 v1.03, midpoint (H)',  'ecotoxicity: freshwater',                'freshwater ecotoxicity potential (FETP)'),     'kg 1,4-DCB-Eq'),
@@ -178,7 +176,7 @@ def create_indicators(replace=True):
 # %%
 # ===========================================================================
 # 3.  Pre-computed CF scores (PSF, CA, bio-based acetic acid)
-#     Taken directly from your literature table — per 1 kg of material.
+#     Taken directly from your literature (see paper). FU per 1 kg of material.
 #     Positive = burden (material consumed by the process).
 # ===========================================================================
 
@@ -308,7 +306,7 @@ def _select_ei_activities():
     # PEG — pore-forming additive
     acts['PEG_item']               = _find_activity('market for triethylene glycol',      'RoW')  #proxy
 
-    # Process water — multiple streams share same activity, kept separate for bookkeeping
+    # Process water — multiple streams share same activity, kept separate for bookeeping
     _water = _find_activity('market for water, deionised', 'RoW')
     acts['water_boresol_item']     = _water
     acts['nonsolvent_item']        = _water
@@ -340,9 +338,6 @@ def _select_ei_activities():
     #Steam
     acts['steam_item']             = _find_activity('steam production, as energy carrier, in chemical industry', 'RoW')  #MJ; qsdsan carries in Kj -- untis conversion
     
-    #In the LCA mian document: I should add to electricity (with the converison eqution) of heat exchangers
-    # and the steam transform units from KJ (in qsdsan) to MJ (in the activity CF)
-
     return acts          
 
 # %%
@@ -394,7 +389,7 @@ def compute_cfs_from_ecoinvent(ei_acts):
 # 6.  organize_cfs — sign conventions and unit conversions
 # ===========================================================================
 
-def organize_cfs(cf_dct_ei): ####something to fix here is the steam --- I have it as energy? no kg, what about utilities?
+def organize_cfs(cf_dct_ei): 
     """
     Combine ecoinvent-derived CFs with pre-computed literature CFs and
     apply sign / unit corrections.
@@ -466,12 +461,12 @@ def create_items(cf_dct, replace=True):
 
 # %%
 # ===========================================================================
-# 8.  get_cf_data — full pipeline (indicators -> activities -> CFs -> organize)
+# 8.  get_cf_data (indicators -> activities -> CFs -> organize)
 # ===========================================================================
 
 def get_cf_data():
     """
-    Run the complete CF generation pipeline. Returns cf_dct.
+    Run the complete CF generation. Returns cf_dct.
     This is the function called by save_cf_data().
     """
     print('Step 1/3  Registering impact indicators in qsdsan...')
@@ -506,8 +501,7 @@ def save_cf_data():
     """
     cf_dct = get_cf_data()   #run the previous function before qsdsan
 
-    #Saves cf_dct as a binary pickle file. Think of pickle as taking a Python 
-    # object (your dict with all the CFs) and freezing it to disk exactly as it is.
+    #Saves cf_dct as a binary pickle file. 
     #  The 'wb' means "write binary". This is the file that _load_lca_data_membrane() 
     # reads every time you run your simulation — so you only need to run the heavy bw2calc 
     # calculations once.
@@ -518,8 +512,9 @@ def save_cf_data():
     
     #Creates a human-readable CSV so you can open it in Excel and visually check the CF values. 
     #The .T transposes the DataFrame so rows are items (NMP_item, PEG_item...) and columns are 
-    #indicators (TAP, GWP...), which is easier to read. This file is just for your inspection 
+    #indicators (TAP, GWP...). This file is just for inspection 
     #The simulation never uses it.
+
     summary = pd.DataFrame(cf_dct).T
     summary.index.name = 'item_ID'
     csv_path = os.path.join(data_path, 'cf_dct_membrane_summary.csv')
@@ -551,13 +546,14 @@ def _load_lca_data_membrane():
     """
 
     #Every time Python starts a new session, qsdsan's registry is completely empty — 
-    # it lives only in memory, not on disk. So before loading any CFs, you need to re-register 
+    # it lives only in memory, not on disk. So before loading any CFs, it is needed to re-register 
     # the 18 ReCiPe indicators (TAP, GWP, etc.) into qsdsan. The replace=False means "only register 
-    # if not already there" — so if somehow they're already registered, don't touch them.
+    # if not already there".
+
     create_indicators(replace=False)   # re-register indicators (in-memory only)
 
-    #Checks that the pickle file actually exists on disk before trying to open it. If you forgot to 
-    #run save_cf_data() first, or the path is wrong, it gives you a clear error message telling you 
+    #Checks that the pickle file actually exists on disk before trying to open it. If  
+    #run save_cf_data() did not run first, or the path is wrong, it give a clear error message telling 
     #exactly what to do instead of a cryptic Python crash.
     
     pckl_path = os.path.join(data_path, 'cf_dct_membrane.pckl')
@@ -571,9 +567,9 @@ def _load_lca_data_membrane():
 
     #Takes the loaded cf_dct and registers all the StreamImpactItem objects into qsdsan's registry
     #After this line, items like NMP_item, PSF_item, wastewater_item etc. are all live in memory 
-    #and ready to be linked to streams in your system.
+    #and ready to be linked to streams in the system.
     
-    create_items(cf_dct, replace=True)  #from the memory we created, we bring it and is ready to be used in qsdsan
+    create_items(cf_dct, replace=True)  #from the memory created, it is now ready to be used in qsdsan
     return cf_dct
 
 #save_cf_data()    #uncomment just for the first time
