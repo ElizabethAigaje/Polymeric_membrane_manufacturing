@@ -22,10 +22,10 @@ import qsdsan as qs
 # %%
 class LCAResults:
     """
-    Computes and saves LCA results per m² membrane in three tables.
+    Computes and saves LCA results per m^2 membrane in three tables.
 
-    Table 1 — Total impacts per m² (one row per indicator)
-    Table 2 — Absolute contribution per source per m²
+    Table 1 — Total impacts per m^2 (one row per indicator)
+    Table 2 — Absolute contribution per source per m^2
     Table 3 — Percentage contribution per source (% of total per indicator)
 
     Parameters
@@ -33,7 +33,7 @@ class LCAResults:
     lca : qs.LCA
         The LCA object returned by system_membrane()
     membrane_area_per_year : float
-        Total membrane area produced per year, [m²/year]. The LCA object returned by system_membrane()
+        Total membrane area produced per year, [m^2/year]. The LCA object returned by system_membrane()
     polymer_option : str
         'PSF', 'CA', or 'CA_bioAA' 
     solvent_recycling : str
@@ -42,6 +42,13 @@ class LCAResults:
         Folder where CSV and Excel files will be saved.
         Defaults to the folder where this script lives.
 
+    Returns
+    ------
+    table1, table2, table3 : pd.DataFrame
+        LCA results in 3 different tables: 
+        TABLE 1 — Total LCA impacts per m²
+        TABLE 2 — Absolute contribution per source [per m²]
+        TABLE 3 — Percentage contribution per source [%]
     """
 
     def __init__(self, lca, membrane_area_per_year, polymer_option,
@@ -61,24 +68,24 @@ class LCAResults:
         lca  = self.lca
         area = self.membrane_area_per_year
 
-        # --- Step 1: get raw annual impacts from qsdsan ---
+        # get raw annual impacts from qsdsan
         stream_raw   = lca.get_impact_table('Stream', annual=True)
         other_raw    = lca.get_impact_table('Other',  annual=True)
         total_annual = lca.get_total_impacts(annual=True)
         indicators   = list(total_annual.keys())
 
-        # --- Step 2: Table 1 — total impacts per m² ---
+        # Table 1 — total impacts per m^2 ---
         table1 = pd.DataFrame({
             'Total per year [unit/year]' : [total_annual[i] for i in indicators],
             'Total per m² [unit/m²]'    : [total_annual[i] / area for i in indicators],
             'Unit'                       : [
                 qs.ImpactIndicator.get_indicator(i).unit
-                if qs.ImpactIndicator.get_indicator(i) else ''   #In case an indicator is not registered, it puts an empety string instead of crushing (if..else)
+                if qs.ImpactIndicator.get_indicator(i) else ''   #In case an indicator is not registered, it puts an empty string instead of crushing (if..else)
                 for i in indicators
             ],
         }, index=pd.Index(indicators, name='Indicator'))  #rows name
 
-        # --- Step 3: helper to extract numeric columns from impact tables ---
+        # helper to extract numeric columns from impact tables
         def extract_impact_cols(df, indicators):
             """
             Parse get_impact_table() output into a dict:
@@ -99,10 +106,10 @@ class LCAResults:
                 contributions[source] = row  #stores the complete row under the soruce name
             return contributions
 
-        stream_contribs = extract_impact_cols(stream_raw, indicators)  #ditionaries of each stream and other with all the indicators. 'solvent': { 'GWP':  1200000.0,..}
+        stream_contribs = extract_impact_cols(stream_raw, indicators)  #dictionaries of each stream and other with all the indicators. 'solvent': { 'GWP':  1200000.0,..}
         other_contribs  = extract_impact_cols(other_raw,  indicators)
 
-        # --- Step 4: Names (labels) for each source ---
+        #Names (labels) for each source ---
         stream_labels = {
             'solvent'               : 'NMP (solvent)',
             'additive'              : 'PEG (additive)',
@@ -130,26 +137,26 @@ class LCAResults:
             'NMP_item'              : 'Makeup NMP (solvent)',
         }
 
-        # --- Step 5: combine all sources, normalize per m² in a unified dict with new labels ---
+        # combine all sources, normalize per m^2 in a unified dict with new labels 
         all_contribs = {}
 
         for raw_id, vals in stream_contribs.items():
-            label = stream_labels.get(raw_id, raw_id)    #the default label is the second, inf not get the frist from stream_labels
+            label = stream_labels.get(raw_id, raw_id)    #the default label is the second, if not get the first from stream_labels
             all_contribs[label] = {ind: v / area for ind, v in vals.items()}
 
         for raw_id, vals in other_contribs.items():
             label = other_labels.get(raw_id, raw_id)
             all_contribs[label] = {ind: v / area for ind, v in vals.items()}
 
-        # --- Step 6: Table 2 — absolute contributions per m² --- (table.loc[Name of the row] select 1 row, table.columns are column headers, and table.index are the row labels, table.index.name is the name of the index column (1st), table.loc['TOtal, 'GWP] select a specific cell
-        table2 = pd.DataFrame(all_contribs).T   #Dict into a dataframe, rows are soruces and columns are indciators
+        # Table 2 — absolute contributions per m^2 --- (table.loc[Name of the row] select 1 row, table.columns are column headers, and table.index are the row labels, table.index.name is the name of the index column (1st), table.loc['TOtal, 'GWP] select a specific cell
+        table2 = pd.DataFrame(all_contribs).T   #Dict into a dataframe, rows are sources and columns are indicators
         table2.index.name = 'Source'
-        table2 = table2.reindex(columns=indicators, fill_value=0.0)  #makes sure the columes are in the same order as indicator list and if any missing it will put 0.0
+        table2 = table2.reindex(columns=indicators, fill_value=0.0)  #makes sure the columns are in the same order as indicator list and if any missing it will put 0.0
         table2.loc['TOTAL'] = table1['Total per m² [unit/m²]']  #add a total row at the end
 
-        # --- Step 7: Table 3 — percentage contributions ---
+        # Table 3 — percentage contributions ---
         totals = table2.loc['TOTAL']
-        table3 = table2.drop('TOTAL').div(totals) * 100   #drop row total, divide all the other rows existing in tabl2 to by totals and make it %
+        table3 = table2.drop('TOTAL').div(totals) * 100   #drop row total, divide all the other rows existing in table2 to by totals and make it %
         table3.index.name = 'Source'
         table3.loc['TOTAL (%)'] = table3.sum()
 
@@ -157,7 +164,7 @@ class LCAResults:
 
     # ------------------------------------------------------------------
     def show(self):
-        """Print all three tables to the console."""
+        """Print all three tables."""
         print('\n' + '='*70)
         print(f'TABLE 1 — Total LCA impacts per m² '
               f'[{self.polymer_option}, recycling={self.solvent_recycling}]'), #name of the scenario
@@ -184,7 +191,7 @@ class LCAResults:
         ----------
         filename_prefix : str, optional
             Prefix for output filenames.
-            Defaults to 'LCA_polymer_option_solvent_recycling'.
+            
         """
         if filename_prefix is None:
             filename_prefix = (

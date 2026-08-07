@@ -37,14 +37,14 @@ def sensitivity_analysis(sys, num_samples, membrane_area_per_year,
     num_samples : int
         Number of Latin Hypercube samples.
     membrane_area_per_year : float
-        Annual membrane output [m²/year].
+        Annual membrane output [m^2/year].
     polymer_option : str
         'PSF', 'CA', or 'CA_bioAA'.
     solvent_recycling : str
         'yes' or 'no'.
     threshold : float, optional
         Minimum absolute Spearman correlation to include a parameter
-        in the heatmap. Default is 0.1 — parameters with all
+        in the heatmap. Default is 0.1; parameters with all
         correlations below this are excluded for clarity.
     save_path : str, optional
         Folder to save the heatmap. Defaults to current script folder.
@@ -60,10 +60,9 @@ def sensitivity_analysis(sys, num_samples, membrane_area_per_year,
     """
 
     save_path = save_path or os.path.dirname(__file__)
+    
+    #Create model with technological parameters
 
-    # =========================================================================
-    # 1. Create model with ONLY technological parameters
-    # =========================================================================
     sensitivity_model = create_model(
         sys                    = sys,
         analysis               = 'technological',
@@ -83,27 +82,27 @@ def sensitivity_analysis(sys, num_samples, membrane_area_per_year,
     n_valid = len(sensitivity_model.table)
     print(f'Valid samples: {n_valid} / {num_samples}')
 
-    # =========================================================================
-    # 2. Get Spearman correlations
-    # =========================================================================
+    # Get Spearman correlations
+  
     r_df, p_df = qs.stats.get_correlations(sensitivity_model, kind='Spearman')
 
-    # =========================================================================
-    # 3. Process correlation dataframe for plotting
-    # =========================================================================
 
-    # --- Clean column names (metric names only, no units) ---
-    # r_df columns are MultiIndex tuples: ('LCA', 'Global warming [kg CO2-Eq/m²]')
+    # Process correlation dataframe for plotting
+  
+
+    # Clean column names (metric names only, no units) 
+    # r_df columns are MultiIndex tuples: ('LCA', 'Global warming [kg CO2-Eq/m2]')
     # Extract just the metric name before the bracket
+
     clean_metric_names = [col[1].split(' [')[0] for col in r_df.columns]
     r_df.columns       = clean_metric_names
 
-    # --- Clean row index (parameter names only, no units) ---
+    # Clean row index (parameter names only, no units) 
     # r_df index are MultiIndex tuples: ('DT101', 'Polymer fraction [w/w %/100]')
+
     clean_param_names = [idx[1].split(' [')[0] for idx in r_df.index]
     r_df.index        = clean_param_names
 
-    # --- Filter parameters below threshold ---
     # Keep only parameters that have at least one correlation >= threshold
     mask        = r_df.abs().max(axis=1) >= threshold
     r_df_filtered = r_df[mask]
@@ -119,10 +118,10 @@ def sensitivity_analysis(sys, num_samples, membrane_area_per_year,
     print(f'Indicators in heatmap: {len(r_df_filtered.columns)}')
 
 
-    # =========================================================================
-    # 4. Print top correlations per indicator
-    # =========================================================================
-    print('\n=== Top 3 parameters per indicator ===')
+
+    # Print top correlations per indicator
+ 
+    print('\n Top 3 parameters per indicator')
     for indicator in r_df_filtered.columns:
         top3 = r_df_filtered[indicator].abs().nlargest(3)
         print(f'\n{indicator}:')
@@ -130,9 +129,9 @@ def sensitivity_analysis(sys, num_samples, membrane_area_per_year,
             sign = '+' if r_df_filtered.loc[param, indicator] > 0 else '-'
             print(f'  {sign}{val:.3f}  {param}')
 
-    # =========================================================================
-    # 5. Heatmap plot
-    # =========================================================================
+  
+    # Heatmap plot
+
     n_params     = len(r_df_filtered)
     n_indicators = len(r_df_filtered.columns)
 
@@ -140,7 +139,7 @@ def sensitivity_analysis(sys, num_samples, membrane_area_per_year,
     font = {'family': 'Arial', 'size': 8}
     plt.rc('font', **font)
 
-    # Figure size scales with number of parameters
+   
     cm_to_in   = 1 / 2.54
     fig_width  = max(12, n_indicators * 0.55) * cm_to_in
     fig_height = max(6, n_params * 0.65) * cm_to_in
@@ -175,9 +174,9 @@ def sensitivity_analysis(sys, num_samples, membrane_area_per_year,
     fig.tight_layout()
     plt.show()
 
-    # =========================================================================
-    # 6. Save outputs
-    # =========================================================================
+   
+    # Save outputs
+
     os.makedirs(save_path, exist_ok=True)
 
     prefix = f'sensitivity_{polymer_option}_recycling{solvent_recycling}'
@@ -192,7 +191,7 @@ def sensitivity_analysis(sys, num_samples, membrane_area_per_year,
     r_df_filtered.to_csv(csv_path)
     print(f'Saved correlations -> {csv_path}')
 
-    # Save p-values table as CSV
+    # Save p-values table as CSV (if needed, uncomment)
     # p_df.columns = clean_metric_names[:len(p_df.columns)]
     # p_df.index   = clean_param_names[:len(p_df.index)]
     # pval_path    = os.path.join(save_path, f'{prefix}_pvalues.csv')

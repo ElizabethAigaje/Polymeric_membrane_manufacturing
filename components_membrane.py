@@ -1,10 +1,32 @@
+"""
+File of the list of components
+
+LC systems analysis to identify green polymer materials and methods
+for membrane manufacturing.
+
+Developed by: Elizabeth Aigaje-Espinosa
+Chemical Engineering Department
+The Pennsylvania State University
+Advisor: Rui Shi
+
+Last modified: 04/27/2026
+"""
+
+
 import qsdsan as qs
 
 __all__ = ('create_components_membrane', )
 
 
 def create_components_membrane():
-#  Setup inlet flows
+    """
+    Create the components needed for membrane manufacturing.
+
+    Returns
+    -------
+    comps1 : qs.Components
+        Components ready to be used in the simulation.
+    """
     
 #Polymer and bore solution
     H2O_chem=qs.Chemical('H2O')
@@ -17,14 +39,11 @@ def create_components_membrane():
     NMP = qs.Component.from_chemical(ID='NMP', chemical=NMP_chem, particle_size='Soluble', degradability='Undegradable', organic=True)
  
 
-    # polysulfone_chem=qs.Chemical.blank(ID='polysulfone', phase='s', MW= 60000)
-    # polysulfone = qs.Component.from_chemical(ID='polysulfone', chemical=polysulfone_chem, particle_size='Particulate', degradability='Undegradable', organic=True,  measured_as = 'COD')
-    
-    #Polysufone will work for polysulfone and CA as properties are based in other components. We mainly need to create the components and densitiy 
-    # (which is specified for each component separately in the 'system-membrane_manufacturing'
     
     polysulfone = qs.Component(ID='polysulfone',  phase='s', particle_size='Particulate', degradability='Undegradable', organic=True,  measured_as = 'COD', MW=60000)
     heptacontane_chem = qs.Chemical('heptacontane')
+
+    #Surrogate for thermo models
     polysulfone.Tm=heptacontane_chem.Tm
     polysulfone.Tb=heptacontane_chem.Tb
     polysulfone.Pc=heptacontane_chem.Pc
@@ -36,9 +55,7 @@ def create_components_membrane():
     polysulfone.V.add_method(0.04838)   #60000/1240/1000  gr/mol/kg/m^3
     # polysulfone.Cn.add_model(82200)   #molar heat capacity 1.37 J/gk * 60000 g/mol
     polysulfone.Psat.add_method(0)
-    #Consider essentially solid resins that do not fit assumption of the EOS/VLE thermodynamic models in QSDsan
-    #Simply model as 'mass-only' solids and bypass thermodynamic modeling entirely
-   
+    #Consider essentially solid resins that do not fit assumption of the EOS/VLE thermodynamic models in QSDsan  
 
 #Additives
 
@@ -57,9 +74,8 @@ def create_components_membrane():
     epoxy_chem=qs.Chemical('araldite 527')
     epoxy = qs.Component.from_chemical(ID='epoxy', chemical=epoxy_chem, particle_size='Soluble', degradability='Undegradable', organic=False)
     epoxy.Hfus=heptacontane_chem.Hfus
-    epoxy.Hf=heptacontane_chem.Hf    #it really does not matter the assumption as it does not go through any calculation
-                                     # but it does need to be defined because if not it causes an error in the heat exchanger calculations
-
+    epoxy.Hf=heptacontane_chem.Hf    #it really does not impact as it does not goes though any calculation
+                                     # but it needs to be defined because if not it causes an error in the heat exchanger calculations
 
 #Cellulose regeneration
     NaOH_chem=qs.Chemical('NaOH')
@@ -70,8 +86,7 @@ def create_components_membrane():
 
     cmps1 = qs.Components([H2O, N2, NMP, polysulfone, PVP, PEG, glycerol, epoxy, NaOH, EtOH]) # *cmps_default
     qs.set_thermo(cmps1, cache=True)
-    #qs.set_thermo(cmps1)
-    
+   
 
     return cmps1
     

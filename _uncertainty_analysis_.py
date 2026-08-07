@@ -38,7 +38,7 @@ def uncertainty_analysis(sys, analysis, num_samples, membrane_area_per_year,
     num_samples : int
         Number of Latin Hypercube samples.
     membrane_area_per_year : float
-        Annual membrane output [m²/year], used to normalize LCA metrics.
+        Annual membrane output [m^2/year], used to normalize LCA metrics.
     polymer_option : str
         'PSF', 'CA', or 'CA_bioAA'.
     solvent_recycling : str
@@ -52,9 +52,7 @@ def uncertainty_analysis(sys, analysis, num_samples, membrane_area_per_year,
         Percentile statistics for each indicator.
     """
 
-    # =========================================================================
-    # 1. Create model and run sampling
-    # =========================================================================
+  
     model_uncertainty = create_model(
         sys                    = sys,
         analysis               = analysis,
@@ -69,9 +67,8 @@ def uncertainty_analysis(sys, analysis, num_samples, membrane_area_per_year,
     model_uncertainty.load_samples(samples)
     model_uncertainty.evaluate()
 
-    # =========================================================================
-    # 2. Extract LCA results — FIX: filter to only actual metric columns
-    # =========================================================================
+
+    # Extract LCA results
 
     # Get the full LCA section of the table
     LCA_table = model_uncertainty.table.loc[:, 'LCA']
@@ -89,9 +86,7 @@ def uncertainty_analysis(sys, analysis, num_samples, membrane_area_per_year,
     LCA_results = LCA_table[actual_metric_names]
     LCA_metrics = actual_metric_names
 
-    # =========================================================================
-    # 3. Get baseline values — FIX: use tuple key access on MultiIndex
-    # =========================================================================
+
     baseline_dict = {}
     for metric in LCA_metrics:
         try:
@@ -109,9 +104,9 @@ def uncertainty_analysis(sys, analysis, num_samples, membrane_area_per_year,
     metric_names = [m.split(' [')[0]      for m in LCA_metrics]
     metric_units = [m.split(' [')[1][:-1] for m in LCA_metrics]
 
-    # =========================================================================
-    # 4. Calculate percentile statistics
-    # =========================================================================
+
+    # Percentile statistics
+   
     percentiles = [2.5, 5, 25, 50, 75, 95, 97.5]
     stats = {}
 
@@ -128,9 +123,9 @@ def uncertainty_analysis(sys, analysis, num_samples, membrane_area_per_year,
         for p_label, v in pcts.items():
             print(f'  {p_label}: {v:.4e}')
 
-    # =========================================================================
-    # 5. KDE plots for all 18 indicators
-    # =========================================================================
+   
+    # KDE plots for all 18 indicators
+
     n_indicators  = len(LCA_metrics)
     n_cols        = 3
     n_rows        = int(np.ceil(n_indicators / n_cols))

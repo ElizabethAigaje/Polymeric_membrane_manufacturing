@@ -34,7 +34,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
     sys : qsdsan.System
         The simulated membrane system returned by system_membrane().
     membrane_area_per_year : float
-        Annual membrane output [m²/year], used to normalize LCA metrics.
+        Annual membrane output [m^2/year], used to normalize LCA metrics.
     polymer_option : str
         'PSF', 'CA', or 'CA_bioAA', help to determine parameters in the model
     solvent_recycling : str
@@ -46,40 +46,26 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
         Model object with parameters and metrics defined, ready for sampling.
     """
 
-    # --- Initialize model ---
+    # Initialize model 
     model = qs.Model(sys)
     param  = model.parameter
     metric = model.metric
 
-    # --- Get LCA object and flowsheet shortcuts ---
+    # Get LCA object 
     lca      = sys.LCA
     flowsheet = qs.Flowsheet.flowsheet.default
     fs_stream = flowsheet.stream
     fs_unit   = flowsheet.unit
 
-    # =========================================================================
-    # PARAMETERS
-    # =========================================================================
-    # Parameters tell the model WHAT to vary and by HOW MUCH.
-    # Each parameter needs:
-    #   name        : readable label for plots and tables
-    #   element     : which part of the system it belongs to (unit ID or 'LCA') This is just a label for organzing results
-    #   kind        : 'coupled' (affects simulation) or 'isolated' (post-sim adjustment)
-    #   units       : string for axis labels
-    #   baseline    : the default/central value
-    #   distribution: probability distribution describing uncertainty range
-    #    -------------------------------------------------------------------------
-
-    # Abreviations: ps = polymer solution, bs = bore solution, rs = regenerant solution, cs = conditioning solution, ww = wastewater
 
     def set_technological_params():
         """
         Parameters that directly affect the simulation outputs.
        
         """
-        # --- System-level variable (aggregated and updated in MmebraneParams) --- (7)
+        # System-level variable (aggregated and updated by MembraneParams, see system-membrane_manufacutring.py) 
 
-        params= fs_unit.DT101.params   #It can be through any unit that has the params term, params is the same object across all units
+        params= fs_unit.DT101.params   #It can be through any unit that has 'params' as an atribute, params is the same object across all units
 
         baseline = params.polymer_fraction  
         dist = shape.Triangle(lower=0.9*baseline, midpoint=baseline, upper=1.1*baseline)
@@ -138,7 +124,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
 
             fs_unit.HX103.T = i + 273.15   
         
-        # --- S1: Bore and polymer solution preparation --- (10)
+        # S1: Bore and polymer solution preparation (10)
         
         baseline = fs_unit.DT101.tau
         dist = shape.Triangle(lower=6, midpoint=baseline, upper=35)
@@ -194,7 +180,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
         def set_Degassing_energy_bs(i):
             fs_unit.DG102.kW_per_m3 = i
         
-        # --- S2: Extrusion, coagulation and rinsing --- (12)
+        # S2: Extrusion, coagulation and rinsing  (12)
 
         baseline = fs_unit.EX201.power_demand
         dist = shape.Triangle(lower=0.9*baseline, midpoint=baseline, upper=1.1*baseline)
@@ -266,7 +252,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
         def set_Rinsing_time(i):
             fs_unit.RT201.tau = i
 
-        # --- S3: Conditioning and drying --- (10)
+        # S3: Conditioning and drying (10)
 
         dist = shape.Uniform(lower=1, upper=1.21)
         @param(name='Glycerol pore filling fraction ', element='M301', kind='coupled', units='%/100', baseline=fs_unit.M301.fraction_filled, distribution=dist)
@@ -323,7 +309,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
         def set_Dryer_efficiency(i):
             fs_unit.DY301.dryer_efficiency = i 
 
-        # --- S4: Module assembly --- (4)
+        # S4: Module assembly (4)
 
         baseline = fs_unit.MD401.electricity_per_membranearea
         dist = shape.Triangle(lower=baseline*0.9, midpoint=baseline, upper=baseline*1.1)
@@ -350,7 +336,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
             def set_Mixing_energy_ww(i):
                  fs_unit.DT501.kW_per_m3 = i 
 
-        # --- S5: WW dilution --- (3)
+        # S5: WW dilution (1)
 
         baseline = fs_unit.WT501.COD_target
         dist = shape.Triangle(lower=baseline*0.9, midpoint=baseline, upper=baseline*1.1)
@@ -358,17 +344,6 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
         def set_Target_COD(i):
             fs_unit.WT501.COD_target = i 
         
-        #It does not make sense to test these 2 since this may happen in a concrete infraestructure, so probably no residence time to set (no tanks), or agitation.
-        # baseline = fs_unit.WT501.tau                                                      
-        # dist = shape.Triangle(lower=baseline*0.9, midpoint=baseline, upper=baseline*1.1)
-        # @param(name='Dilution time', element='WT501', kind='coupled', units='h', baseline=baseline, distribution=dist)
-        # def set_Dilution_time(i):
-        #     fs_unit.WT501.tau = i 
-        
-        # dist = shape.Uniform(lower=0.01, upper=0.02)
-        # @param(name='Dilution energy demand', element='WT501', kind='coupled', units='kW/m^3', baseline=fs_unit.WT501.kW_per_m3, distribution=dist)
-        # def set_Dilution_energy_demand(i):
-        #     fs_unit.WT501.kW_per_m3 = i 
 
 
     def set_lca_params():
@@ -377,7 +352,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
         These are 'isolated', they only change characterization factors.
         It is only included the parameters that show to have an impact bigger than 10%
         in more than 1 indicator, or to to be the major contributor in at leas 1 indicator
-        accroding to the baseline analysis.
+        according to the baseline analysis.
         """
         # -----------------------------------------------------------------------
         # Using log-normal distribution where:
@@ -387,12 +362,12 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
         # Then: CF_new = CF_baseline * i  for ALL 18 indicators simultaneously
         # -----------------------------------------------------------------------
 
-        # NMP — all 18 indicators vary together with same GSD²
+        # NMP — all 18 indicators vary together with same GSD^2
         NMP_item = qs.ImpactItem.get_item('NMP_item')
         GSD_NMP = 1.056193047   # from pedigree matrix in uncertainty variable.xls
         baseline_CFs_NMP = {ind: NMP_item.CFs[ind] for ind in NMP_item.CFs}  #loops over the indicator key that lives inside qsdsan-the baseline
 
-        dist = shape.LogNormal(mu=0, sigma=np.log(GSD_NMP))   #sigma or variance is the square root of the standar deviation
+        dist = shape.LogNormal(mu=0, sigma=np.log(GSD_NMP))  
         @param(name='NMP background', element='LCA', kind='isolated',
             units='-', baseline=1.0, distribution=dist)   #baseline will be the cf_baseline*1 
         def set_NMP_uncertainty(i):
@@ -401,7 +376,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
             for ind, cf_baseline in baseline_CFs_NMP.items():
                 NMP_item.CFs[ind] = cf_baseline * i
 
-        # --- Glycerol (conditioning) ---
+        # Glycerol (conditioning) 
         glycerol_item         = qs.ImpactItem.get_item('glycerol_item')
         GSD_glycerol          = 1.055238601   
         baseline_CFs_glycerol = {ind: glycerol_item.CFs[ind] for ind in glycerol_item.CFs}
@@ -413,7 +388,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
             for ind, cf_baseline in baseline_CFs_glycerol.items():
                 glycerol_item.CFs[ind] = cf_baseline * i
 
-        # --- Steam ---
+        # Steam 
         steam_item         = qs.ImpactItem.get_item('steam_item')
         GSD_steam          = 1.055238601   
         baseline_CFs_steam = {ind: steam_item.CFs[ind] for ind in steam_item.CFs}
@@ -426,7 +401,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
                 steam_item.CFs[ind] = cf_baseline * i
 
     
-        # --- Softened water or water for wastewater dilution---
+        # Softened water or water for wastewater dilution
         water_ww_item         = qs.ImpactItem.get_item('water_wwt_item')
         GSD_water_ww          = 1.060597437   
         baseline_CFs_waterww = {ind: water_ww_item.CFs[ind] for ind in water_ww_item.CFs}
@@ -438,7 +413,7 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
             for ind, cf_baseline in baseline_CFs_waterww.items():
                 water_ww_item.CFs[ind] = cf_baseline * i
        
-        # --- Wastewater treatment burden to the wastewater produced ---
+        # Wastewater treatment burden to the wastewater produced 
         wastewater_item         = qs.ImpactItem.get_item('wastewater_item')
         GSD_wastewater          = 1.06596836  # replace with your pedigree value
         baseline_CFs_wastewater = {ind: wastewater_item.CFs[ind] for ind in wastewater_item.CFs}
@@ -463,19 +438,15 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
                 for ind, cf_baseline in baseline_CFs_ethanol.items():
                     ethanol_item.CFs[ind] = cf_baseline * i
     
+        # Uncertainty of inventories out of ecoinvent
 
         # Load fitted parameters
-        fitted = pd.read_csv(
-            os.path.join(os.path.dirname(__file__), 'fitted_params_all_polymers.csv')
-        )
+        fitted = pd.read_csv(os.path.join(os.path.dirname(__file__), 'fitted_params_all_polymers.csv'))
 
-        # =========================================================================
-        # PART 2 — Polymer CF uncertainty
-        # =========================================================================
 
-        # --- PSF module housing — ALWAYS included regardless of polymer_option ---
+        # PSF module housing — ALWAYS included regardless of polymer_option ---
         # Because module housing is always PSF even when membrane is CA or CA_bioAA
-        PSF_module_item         = qs.ImpactItem.get_item('PSF_module_item')
+        PSF_module_item   = qs.ImpactItem.get_item('PSF_module_item')
 
         for ind in INDICATOR_IDS:
             row = fitted[(fitted['polymer'] == 'PSF') &
@@ -498,10 +469,10 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
                 return set_PSF_module_CF
             make_setter_PSF_module(ind)
 
-        # --- Membrane polymer — depends on polymer_option ---
+        #  Membrane polymer — depends on polymer_option:
 
         if polymer_option == 'PSF':
-            PSF_item         = qs.ImpactItem.get_item('PSF_item')
+            PSF_item  = qs.ImpactItem.get_item('PSF_item')
 
             for ind in INDICATOR_IDS:
                 row = fitted[(fitted['polymer'] == 'PSF') &
@@ -586,15 +557,8 @@ def create_model(sys, analysis,membrane_area_per_year, polymer_option, solvent_r
         raise RuntimeError(f'In create_model(sys,analysis,membrane_area_per_year, polymer_option, solvent_recycling),parameter={analysis} is not "all", "technological" or "background". Please define as one of these.')
         
 
-    # =========================================================================
+
     # METRICS
-    # =========================================================================
-    # Metrics tell the model WHAT TO MEASURE after each simulation run.
-    # Each metric needs:
-    #   name    : readable label for plots and tables
-    #   units   : string for axis labels
-    #   element : 'LCA' 
-    #
     # -------------------------------------------------------------------------
 
     @metric(name='Global Warming', units='kg CO2-Eq/m²', element='LCA')
